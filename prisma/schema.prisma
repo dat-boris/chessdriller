@@ -44,7 +44,7 @@ model AuthKey {
 }
 
 //
-// 
+//
 //
 
 model User {
@@ -64,7 +64,7 @@ model User {
 	// user settings are implemented as columns in the User table until unwieldly or slow
 
 	// whether to display the name of the lichessStudy/PGN the current line came from when studying
-	settingsStudyDisplayLineSource    Boolean @default(false) 
+	settingsStudyDisplayLineSource    Boolean @default(false)
 }
 
 model Move {
@@ -101,6 +101,7 @@ model LichessStudy {
 	moves                      Move[]
 	included                   Boolean @default(false) // true if included in repertoire
 	repForWhite                Boolean? // true if pgn belongs to White repertoire
+	onlyVariant                Boolean? // true if we only import variants
 	guessedColor               String // guess on whether repertoire is w/b/u
 	previewFen                 String // FEN used for board preview in repertoire view
 	hidden                     Boolean @default(false) // true if hidden from the "studies" list

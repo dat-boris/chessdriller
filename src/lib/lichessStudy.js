@@ -10,9 +10,9 @@ import { pgndbToMoves, guessColor, makePreviewFen } from '$lib/pgnParsing.js';
 // - renaming studies renamed on Lichess
 
 export async function fetchAllStudyChanges( user_id, prisma, lichess_username, lichess_access_token ) {
-	
+
 	// fetch existing study IDs from database
-	
+
 	const existing_studies = await prisma.LichessStudy.findMany({
 		where: { userId: user_id },
 		select: {
@@ -33,7 +33,7 @@ export async function fetchAllStudyChanges( user_id, prisma, lichess_username, l
 	});
 	const existing_study_ids = new Set( existing_studies.map( (study) => study.lichessId ) );
 
-	
+
 	// fetch study IDs from Lichess
 
 	const lichess_studies = await fetchStudiesMetadata( lichess_username, lichess_access_token );
@@ -199,15 +199,14 @@ export async function fetchStudyUpdate( user_id, study_id, prisma, lichess_usern
 	if ( ! study.included )
 		throw new Error('Only studies that are part of your repertoire can be updated with fetchStudyUpdate, use updateUnincludedStudy.');
 
-	
+
 	// fetch new PGN
 
 	const { pgn, lastModified } = await fetchStudy( study.lichessId, lichess_username, lichess_access_token );
 
-	
+
 	// find number of new/removed moves
-	
-	const updated_moves = pgndbToMoves( pgn, study.repForWhite );
+	const updated_moves = pgndbToMoves( pgn, study.repForWhite, study.onlyVariant );
 	const { new_moves, removed_moves } = compareMovesLists( study.moves, updated_moves );
 
 	const numNewMoves = new_moves.length;
@@ -300,19 +299,21 @@ export async function deleteStudy( user_id, study_id, prisma ) {
 }
 
 // Include study
-export async function includeStudy( study_id, prisma, user_id, repForWhite ) {
+export async function includeStudy( study_id, prisma, user_id, repForWhite, onlyVariant = false ) {
 	const study = await prisma.LichessStudy.findUniqueOrThrow({
 		where: { id: study_id }
 	});
-	if ( study.userId != user_id ) 
+	if ( study.userId != user_id )
 		throw new Error( 'Adding Lichess study failed: user ID does not match' );
 	if ( study.hidden )
 		throw new Error( 'Adding Lichess study failed: can\'t import hidden study, unhide it first' );
 	if ( study.included )
 		throw new Error( 'Adding Lichess study failed: study is already included' );
-	
+
 	// parse PGN
-	const moves = pgndbToMoves( study.pgn, repForWhite );
+	// STOPSHIP: now by default only include variants, should be passed from UI
+	onlyVariant = true;
+	const moves = pgndbToMoves( study.pgn, repForWhite, onlyVariant );
 
 	// insert moves
 	let queries = [];
@@ -341,7 +342,7 @@ export async function includeStudy( study_id, prisma, user_id, repForWhite ) {
 		where: { id: study_id },
 		data: {
 			included: true,
-			repForWhite
+			repForWhite,
 		}
 	}) );
 
@@ -358,7 +359,7 @@ export async function includeStudy( study_id, prisma, user_id, repForWhite ) {
 // Soft-deletes all moves that are not in another PGN/Study.
 // Returns the number of deleted moves.
 export async function unincludeStudy( study_id, user_id, prisma ) {
-	
+
 	// get study and all moves
 	const study = await prisma.LichessStudy.findUnique( {
 		where: { id: study_id },
@@ -380,7 +381,7 @@ export async function unincludeStudy( study_id, user_id, prisma ) {
 	// Soft-delete moves
 	let queries = orphanMoveSoftDeletionsQueries( study.moves, prisma );
 	const num_deleted_moves = queries.length;
-	
+
 	// Set the study to not included and disconnect moves
 	queries.push( prisma.LichessStudy.update({
 		where: { id: study_id },

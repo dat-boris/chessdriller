@@ -74,6 +74,7 @@
 		<button class="cdbutton add" on:click|preventDefault={()=>adding_state=1}>+ add to repertoire</button>
 	{:else if adding_state == 1}
 		<p in:slide|local>Which color?
+			<!-- STOPSHIP: add input box to decide if we want to import variations only -->
 			<button class="add_white" on:click|once={addWhite}>White</button>
 			<button class="add_black" on:click|once={addBlack}>Black</button>
 		</p>

@@ -6,9 +6,9 @@ import { Pgn } from '../../node_modules/cm-pgn/src/Pgn.js';
  */
 
 // Convert PGN database file (multiple concatenated PGNs) to a moves-list.
-export function pgndbToMoves( pgndb, repForWhite ) {
+export function pgndbToMoves( pgndb, repForWhite, onlyVariant = false ) {
 	const pgntexts = split_pgndb_into_pgns( pgndb );
-	return pgntexts.map( (pgn) => singlePgnToMoves( pgn, repForWhite ) ).flat();
+	return pgntexts.map( (pgn) => singlePgnToMoves( pgn, repForWhite, onlyVariant ) ).flat();
 }
 
 // Number of chapters/games in a PGN database file.
