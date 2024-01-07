@@ -20,9 +20,9 @@ export function pgndbNumChapters( pgndb ) {
 
 // Converts text from single PGN game to a moves-list.
 // Exported only as a test utility.
-export function singlePgnToMoves( pgn_content, repForWhite ) {
+export function singlePgnToMoves( pgn_content, repForWhite, onlyVariant = false ) {
 	const cmpgn_moves = singlePgnToCMPgnMoves( pgn_content );
-	return chessHistoryToMoves( cmpgn_moves, repForWhite );
+	return chessHistoryToMoves( cmpgn_moves, repForWhite, onlyVariant );
 }
 
 function singlePgnToCMPgnMoves( pgn_content ) {
@@ -34,7 +34,7 @@ function singlePgnToCMPgnMoves( pgn_content ) {
 	// Remove trailing newlines/spaces
 	pgn_content = pgn_content.replace(/\s*$/gs, '');
 
-	// Detect empty PGN with simple regex. 
+	// Detect empty PGN with simple regex.
 	// Empty (zero moves) PGNs are invalid, but we try to handle them since
 	// Lichess can produce them, in particular as a chapter of a study.
 	if ( pgn_content.match(/^\[.*?\]\s*(\*|1-0|0-1|1\/2-1\/2)\s*$/m) ) {
@@ -46,20 +46,27 @@ function singlePgnToCMPgnMoves( pgn_content ) {
 }
 
 // Traverse all cm-pgn moves, including variations, and returns moves-list
-function chessHistoryToMoves( history, repForWhite ) {
+// If onlyVariant = true, only capture the first move after a variation.
+function chessHistoryToMoves( history, repForWhite, onlyVariant = false, isVariant = false ) {
 	const moves = [];
+	let toCaptureFirstAfterVariation = isVariant;
 	for ( const move of history ) {
 		const ownMove = ( repForWhite && move.color == 'w' || !repForWhite && move.color == 'b' );
-		moves.push( {
-			repForWhite,
-			ownMove,
-			fromFen: normalize_fen( move.previous ? move.previous.fen : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' ),
-			toFen:   normalize_fen(move.fen),
-			moveSan: move.san,
-		} );
+		if (!onlyVariant || toCaptureFirstAfterVariation) {
+			moves.push( {
+				repForWhite,
+				ownMove,
+				fromFen: normalize_fen( move.previous ? move.previous.fen : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' ),
+				toFen:   normalize_fen(move.fen),
+				moveSan: move.san,
+			} );
+			// We captured first after a variation, so we don't capture first after the next move
+			toCaptureFirstAfterVariation = false;
+		}
 		// traverse variations
 		for ( const variation of move.variations ) {
-			const variation_moves = chessHistoryToMoves( variation, repForWhite );
+			// We want to capture at least the first move in this variation
+			const variation_moves = chessHistoryToMoves( variation, repForWhite, onlyVariant, true );
 			moves.push( ...variation_moves );
 		}
 	}

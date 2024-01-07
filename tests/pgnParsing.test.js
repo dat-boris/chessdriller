@@ -117,10 +117,40 @@ describe( 'singlePgnToMoves', () => {
 			{ moveSan: 'Bg5' }
 		]);
 	});
+	test('two comments before variant (only variants)', () => {
+		const pgn_content = fs.readFileSync( './tests/pgn/two-comments-before-variant.pgn', 'utf8' );
+		const moves = singlePgnToMoves( pgn_content, true, true );
+		expect( moves ).toHaveLength( 1 );
+		expect( moves ).toMatchObject([
+			{
+				fromFen: 'rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq',
+				moveSan: 'Bg5'
+			}
+		]);
+	});
 	test('two comments before variant (three times)', () => {
 		const pgn_content = fs.readFileSync( './tests/pgn/two-comments-before-variant-thrice.pgn', 'utf8' );
 		const moves = singlePgnToMoves( pgn_content, true );
 		expect( moves ).toHaveLength( 8 );
+	});
+	test('two comments before variant (three times - only variants)', () => {
+		const pgn_content = fs.readFileSync( './tests/pgn/two-comments-before-variant-thrice.pgn', 'utf8' );
+		const moves = singlePgnToMoves( pgn_content, true, true );
+		expect( moves ).toHaveLength( 3 );
+		expect( moves ).toMatchObject([
+			{
+				fromFen: 'rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq',
+				moveSan: 'Bg5'
+			},
+			{
+				fromFen: 'rnbqkb1r/pppppppp/5n2/8/3P1B2/8/PPP1PPPP/RN1QKBNR b KQkq',
+				moveSan: 'g6'
+			},
+			{
+				fromFen: 'rnbqkb1r/ppp1pppp/5n2/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq',
+				moveSan: 'Nf3'
+			},
+		]);
 	});
 
 	// PGNs must have at least one move according to spec, but zero-moves PGNs should be handled anyway.
@@ -217,7 +247,7 @@ describe( 'pgndbToMoves', () => {
 		expect( moves.filter( (m) => m.moveSan === 'a5' ) ).toHaveLength( 48 );
 		expect( moves.filter( (m) => m.fromFen === 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq' ) ).toHaveLength( 64 );
 	} );
-		 
+
 } );
 
 /*
