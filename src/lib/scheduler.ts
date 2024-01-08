@@ -31,14 +31,14 @@ export type MoveWithPossibleBranches = Move & { branches?: Move[] };
  *   lastLineIds: array of move IDs for the last line studied
  *
  * Output: {
- *   line: array of moves (not just move IDs), starting from the first move 
+ *   line: array of moves (not just move IDs), starting from the first move
  *   start_ix: line[start_ix] is the first move to be quized (prior moves were part of last line)
  *   num_due_moves: total number of due moves
  * }
  *
  * Algorithm:
  *   0. If no last_line was given, go to step 3.
- *   1. Rewind the final move of the last line. 
+ *   1. Rewind the final move of the last line.
  *   2. Search breadth-first for a continuation with a due move.
  *      If no continuation is found, go to step 1 and rewind another move.
  *      When one is found, pick it and append to the line.
@@ -47,11 +47,11 @@ export type MoveWithPossibleBranches = Move & { branches?: Move[] };
  *      If multiple continuations found at same depth, pick one randomly and repeat.
  *      If a single continuation is found, pick it and repeat.
  *
- * Note: DoS-vulnerable to malign/pathological PGNs. 
+ * Note: DoS-vulnerable to malign/pathological PGNs.
  *
- * It would be interesting to find the "optimal" line, i.e. with as many due 
- * moves as possible. This would be the single-pair longest path of a 
- * 0/1-weighted cyclic directed graph, which I'd guess is O(n!)? However a 
+ * It would be interesting to find the "optimal" line, i.e. with as many due
+ * moves as possible. This would be the single-pair longest path of a
+ * 0/1-weighted cyclic directed graph, which I'd guess is O(n!)? However a
  * repertoire is small and sparse, and can surely be brute-forced reasonably.
  *
  */
@@ -59,7 +59,7 @@ export async function getLineForStudy( repertoire: Move[], now: Date, lastLineId
 
 	const InitialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq';
 
-	// No due moves: short-circuit 
+	// No due moves: short-circuit
 	const dueMoves = repertoire.filter( m => moveIsDue(m,now) );
 	const num_due_moves = dueMoves.length;
 	if ( num_due_moves == 0 ) {
@@ -81,7 +81,7 @@ export async function getLineForStudy( repertoire: Move[], now: Date, lastLineId
 	// (while loop is skipped if no lastLine supplied)
 	let lastFinalMove;
 	while ( lastFinalMove = line.pop() ) {
-		const currentFen = line.length == 0 ? InitialFen : line[line.length-1].toFen;
+		const currentFen = line.length == 0 ? line[0].fromFen : line[line.length-1].toFen;
 		const nextMoveIsOwn = lastFinalMove.ownMove;
 		const repForWhite = lastFinalMove.repForWhite;
 		const continuation = bfsDueContinuationToEnd( repertoire, now, currentFen, repForWhite, nextMoveIsOwn, new Set(lastLineIds) );
@@ -100,14 +100,14 @@ export async function getLineForStudy( repertoire: Move[], now: Date, lastLineId
 	let nextMoveIsOwn = repForWhite;
 
 	// White or Black (random)
-	line = bfsDueContinuationToEnd( repertoire, now, InitialFen, repForWhite, nextMoveIsOwn );
+	line = bfsDueContinuationToEnd( repertoire, now, null, repForWhite, nextMoveIsOwn );
 	if ( line.length > 0 ) {
 		return { line, start_ix: 0, due_ix: lineToDueIx(line,now), num_due_moves };
 	}
 	// Black or White
 	repForWhite = ! repForWhite;
 	nextMoveIsOwn = ! nextMoveIsOwn;
-	line = bfsDueContinuationToEnd( repertoire, now, InitialFen, repForWhite, nextMoveIsOwn );
+	line = bfsDueContinuationToEnd( repertoire, now, null, repForWhite, nextMoveIsOwn );
 	if ( line.length > 0 ) {
 		return { line, start_ix: 0, due_ix: lineToDueIx(line,now), num_due_moves };
 	}
@@ -121,7 +121,7 @@ function lineToDueIx( line: MoveWithPossibleBranches[], now: Date ): number[] {
 	return line.map( (m,i) => ( moveIsDue(m,now) ? i : -1 ) ).filter( i => i>=0 );
 }
 
-function bfsDueContinuationToEnd( repertoire: Move[], now: Date, fen: string, repForWhite: boolean, nextMoveIsOwn: boolean, excludedMoveIds: Set<number> = new Set() ): MoveWithPossibleBranches[] {
+function bfsDueContinuationToEnd( repertoire: Move[], now: Date, fen: string | null, repForWhite: boolean, nextMoveIsOwn: boolean, excludedMoveIds: Set<number> = new Set() ): MoveWithPossibleBranches[] {
 	const movesSoFar: Move[] = [];
 	// greedily append due moves no more are found
 	while ( true ) {
@@ -150,12 +150,13 @@ function bfsDueContinuationToEnd( repertoire: Move[], now: Date, fen: string, re
 	return movesSoFar;
 }
 
-function bfsDueContinuation( repertoire: Move[], now: Date, fen: string, repForWhite: boolean, nextMoveIsOwn: boolean, excludedMoveIds: Set<number> ): MoveWithPossibleBranches[] {
+function bfsDueContinuation( repertoire: Move[], now: Date, fen: string | null, repForWhite: boolean, nextMoveIsOwn: boolean, excludedMoveIds: Set<number> ): MoveWithPossibleBranches[] {
 
 	const initialPossibleMoves: Move[] = repertoire.filter( (m) =>
 		m.repForWhite === repForWhite
 		&& m.ownMove === nextMoveIsOwn
-		&& m.fromFen === fen
+		// If an initial fen is supplied, say yes else just match anything
+		&& (fen ? m.fromFen === fen : true)
 		&& ! excludedMoveIds.has( m.id )
 	);
 	let continuationsNextPly: MoveWithPossibleBranches[][] = includeBranches(initialPossibleMoves).map( (m) => [m] );
@@ -196,7 +197,7 @@ function includeBranches( moves: Move[] ): MoveWithPossibleBranches[] {
 	let movesWithPossibleBranches: MoveWithPossibleBranches[] = [];
 	for ( const move of moves ) {
 		if ( move.ownMove && moves.length > 1 ) {
-			// branching own move 
+			// branching own move
 			const branches = moves.filter( (m) => m !== move );
 			const moveWithBranches: MoveWithPossibleBranches = {
 				...move,
@@ -246,7 +247,7 @@ export function moveIsDue( move: Move, now: Date ) {
 	} else if ( move.learningDueTime ) {
 		return move.learningDueTime <= now;
 	} else if ( move.reviewDueDate ) {
-		return move.reviewDueDate <= now; 
+		return move.reviewDueDate <= now;
 	} else {
 		throw new Error( 'invalid move own/learning/review state in moveIsDue for move #'+move.id );
 	}
